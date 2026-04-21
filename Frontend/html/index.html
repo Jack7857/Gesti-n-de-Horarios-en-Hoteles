@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hotel Palmares — Sistema de Gestión</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════
+     TOAST CONTAINER
+     ═══════════════════════════════════ -->
+<div id="toast-container"></div>
+
+<!-- ═══════════════════════════════════
+     LOGIN — HU-01
+     Autenticación con roles diferenciados
+     ═══════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-box">
+    <h1 class="login-brand">Hotel Palmares</h1>
+    <span class="login-subtitle">Sistema de Gestión Hotelera</span>
+
+    <div id="login-error" class="login-error">
+      <i class="bi bi-exclamation-circle me-1"></i>
+      <span id="login-error-msg">Credenciales incorrectas.</span>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Correo institucional</label>
+      <input id="loginEmail" class="form-input" type="email" placeholder="usuario@hotelpalmares.cr" autocomplete="email" />
+      <div id="err-email" class="form-error">Ingrese un correo válido.</div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Contraseña</label>
+      <input id="loginPwd" class="form-input" type="password" placeholder="Contraseña" autocomplete="current-password" />
+      <div id="err-pwd" class="form-error">La contraseña no puede estar vacía.</div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Sucursal</label>
+      <select id="loginBranch" class="form-input">
+        <option value="Palmares">Palmares, Alajuela</option>
+        <option value="Jacó">Jacó, Puntarenas</option>
+        <option value="La Fortuna">La Fortuna, Alajuela</option>
+      </select>
+    </div>
+
+    <button class="btn btn-primary btn-lg btn-full mt-4" onclick="App.login()">
+      Iniciar sesión
+    </button>
+
+    <p class="text-xs text-muted text-center mt-12">
+      Credenciales de prueba — admin / supervisor / empleado<br>
+      Contraseña: cualquier valor no vacío
+    </p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     APLICACIÓN PRINCIPAL
+     ═══════════════════════════════════ -->
+<div id="app">
+
+  <!-- ── SIDEBAR ── -->
+  <aside id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-name">Hotel<br>Palmares</div>
+      <span class="sidebar-brand-sub">Sistema de Gestión</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <span class="nav-label">Principal</span>
+        <button class="nav-item active" data-page="dashboard" onclick="App.navigate('dashboard', this)">
+          <i class="bi bi-grid-1x2"></i> Dashboard
+        </button>
+        <button class="nav-item" data-page="checador" onclick="App.navigate('checador', this)">
+          <i class="bi bi-clock"></i> Reloj Checador
+        </button>
+      </div>
+
+      <div class="nav-section" id="nav-admin">
+        <span class="nav-label">Administración</span>
+        <button class="nav-item" data-page="empleados" onclick="App.navigate('empleados', this)">
+          <i class="bi bi-people"></i> Empleados
+        </button>
+        <button class="nav-item" data-page="horarios" onclick="App.navigate('horarios', this)">
+          <i class="bi bi-calendar3"></i> Horarios
+        </button>
+        <button class="nav-item" data-page="inventario" onclick="App.navigate('inventario', this)">
+          <i class="bi bi-box-seam"></i> Inventario
+          <span class="nav-badge" id="badge-inventario"></span>
+        </button>
+        <button class="nav-item" data-page="reportes" onclick="App.navigate('reportes', this)">
+          <i class="bi bi-file-earmark-bar-graph"></i> Reportes
+        </button>
+      </div>
+
+      <div class="nav-section" id="nav-super-admin">
+        <span class="nav-label">Sistema</span>
+        <button class="nav-item" data-page="sucursales" onclick="App.navigate('sucursales', this)">
+          <i class="bi bi-building"></i> Sucursales
+        </button>
+        <button class="nav-item" data-page="roles" onclick="App.navigate('roles', this)">
+          <i class="bi bi-shield-check"></i> Roles y permisos
+        </button>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="nav-item" onclick="App.logout()">
+        <i class="bi bi-box-arrow-left"></i> Cerrar sesión
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <div id="main">
+
+    <!-- Topbar -->
+    <header id="topbar">
+      <span class="topbar-title" id="topbar-title">Dashboard</span>
+
+      <div class="topbar-branch" id="topbar-branch-wrap">
+        <i class="bi bi-building"></i>
+        <select class="form-select" id="topbar-branch" onchange="App.changeBranch(this.value)">
+          <option value="Palmares">Palmares</option>
+          <option value="Jacó">Jacó</option>
+          <option value="La Fortuna">La Fortuna</option>
+        </select>
+      </div>
+
+      <div class="topbar-user">
+        <div class="user-avatar" id="topbar-avatar">??</div>
+        <span id="topbar-name">—</span>
+        <span class="chip chip-empleado" id="topbar-role">—</span>
+      </div>
+    </header>
+
+    <!-- Contenido -->
+    <main id="content">
+
+      <!-- ══════════════════════════════
+           DASHBOARD — HU-19, HU-20
+           ══════════════════════════════ -->
+      <div id="page-dashboard" class="page active">
+        <div class="section-header">
+          <h2>Dashboard</h2>
+          <span class="text-sm text-muted" id="dash-branch-label">Sede: Palmares</span>
+        </div>
+
+        <!-- Métricas principales -->
+        <div class="row g-3 mb-4">
+          <div class="col-6 col-md-3">
+            <div class="stat-card">
+              <div class="stat-icon" style="background:#f0ebe3;color:var(--accent)">
+                <i class="bi bi-people-fill"></i>
+              </div>
+              <div class="stat-value">
+                <span id="dash-presentes">0</span>
+                <span class="stat-value-unit" id="dash-total-emp"></span>
+              </div>
+              <div class="stat-label">Empleados presentes</div>
+              <div class="stat-delta text-success">
+                <i class="bi bi-circle-fill" style="font-size:7px"></i> Tiempo real
+              </div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="stat-card">
+              <div class="stat-icon" style="background:var(--warning-lt);color:var(--warning)">
+                <i class="bi bi-pause-circle"></i>
+              </div>
+              <div class="stat-value"><span id="dash-pausas">0</span></div>
+              <div class="stat-label">En pausa</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="stat-card">
+              <div class="stat-icon" style="background:var(--danger-lt);color:var(--danger)">
+                <i class="bi bi-exclamation-triangle"></i>
+              </div>
+              <div class="stat-value"><span id="dash-alertas">0</span></div>
+              <div class="stat-label">Alertas de stock</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="stat-card">
+              <div class="stat-icon" style="background:var(--success-lt);color:var(--success)">
+                <i class="bi bi-box-seam"></i>
+              </div>
+              <div class="stat-value">
+                <span id="dash-stock-ok">0</span>
+                <span class="stat-value-unit">%</span>
+              </div>
+              <div class="stat-label">Stock en nivel normal</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <!-- Asistencia 7 días -->
+          <div class="col-md-5">
+            <div class="card card-pad h-100">
+              <div class="section-header mb-2">
+                <h3 style="font-size:16px;">Asistencia — 7 días</h3>
+                <span class="text-xs text-muted">Sede actual</span>
+              </div>
+              <div class="bar-chart-wrap mb-1" id="dash-barchart"></div>
+              <div class="bar-labels" id="dash-barlabels"></div>
+
+              <hr class="section-divider">
+
+              <div class="section-header mb-2">
+                <h3 style="font-size:16px;">Personal activo</h3>
+                <button class="btn btn-ghost btn-sm" onclick="App.navigate('checador', null)">
+                  Ver checador
+                </button>
+              </div>
+              <div id="dash-personal-list"></div>
+            </div>
+          </div>
+
+          <!-- Alertas inventario + métricas -->
+          <div class="col-md-7">
+            <div class="card card-pad h-100">
+              <div class="section-header mb-2">
+                <h3 style="font-size:16px;">Alertas de inventario</h3>
+                <button class="btn btn-ghost btn-sm" onclick="App.navigate('inventario', null)">
+                  Ver todo
+                </button>
+              </div>
+              <div id="dash-alertas-list"></div>
+
+              <hr class="section-divider">
+              <div class="row g-2" id="dash-mini-metrics"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════
+           RELOJ CHECADOR — HU-09, HU-10, HU-11
+           ══════════════════════════════ -->
+      <div id="page-checador" class="page">
+        <div class="section-header">
+          <h2>Reloj Checador</h2>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-5">
+            <div class="clock-card mb-3">
+              <div class="clock-display" id="clock-time">00:00:00</div>
+              <div class="clock-date" id="clock-date">—</div>
+              <hr class="section-divider">
+              <div class="clock-user-info" id="clock-user-info"></div>
+
+              <div id="checador-status-chip" class="mb-3"></div>
+
+              <div class="d-flex gap-8 justify-content-center flex-wrap">
+                <button id="btn-entrada" class="btn btn-primary" onclick="App.checadorAction('entrada')">
+                  <i class="bi bi-box-arrow-in-right"></i> Registrar entrada
+                </button>
+                <button id="btn-pausa" class="btn btn-outline" onclick="App.checadorAction('pausa')" disabled>
+                  <i class="bi bi-pause"></i> Pausa
+                </button>
+                <button id="btn-salida" class="btn btn-outline" onclick="App.checadorAction('salida')" disabled>
+                  <i class="bi bi-box-arrow-right"></i> Salida
+                </button>
+              </div>
+            </div>
+
+            <!-- HU-11 — Mis turnos -->
+            <div class="card card-pad">
+              <h3 style="font-size:16px;" class="mb-12">Mis turnos — semana actual</h3>
+              <div class="week-grid" id="week-grid"></div>
+            </div>
+          </div>
+
+          <div class="col-md-7">
+            <!-- Historial del día -->
+            <div class="card card-pad mb-3">
+              <h3 style="font-size:16px;" class="mb-12">Historial del día</h3>
+              <div id="clock-log">
+                <p class="text-sm text-muted text-center" style="padding:16px 0;">Sin registros hoy.</p>
+              </div>
+            </div>
+
+            <!-- Asistencia del turno (supervisor/admin) -->
+            <div class="table-card" id="turno-table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Empleado</th>
+                    <th>Área</th>
+                    <th>Entrada</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="turno-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════
+           EMPLEADOS — HU-05, HU-06, HU-07, HU-08
+           ══════════════════════════════ -->
+      <div id="page-empleados" class="page">
+        <div class="section-header">
+          <h2>Empleados</h2>
+          <button class="btn btn-accent" onclick="App.openEmpleadoModal()" id="btn-nuevo-emp">
+            <i class="bi bi-plus"></i> Nuevo empleado
+          </button>
+        </div>
+
+        <div class="toolbar">
+          <div class="search-wrap">
+            <i class="bi bi-search"></i>
+            <input class="search-input" type="text" id="emp-search" placeholder="Buscar empleado..." oninput="App.filterEmpleados()" />
+          </div>
+          <select class="form-select" id="emp-filter-sede" onchange="App.filterEmpleados()">
+            <option value="">Todas las sedes</option>
+            <option value="Palmares">Palmares</option>
+            <option value="Jacó">Jacó</option>
+            <option value="La Fortuna">La Fortuna</option>
+          </select>
+          <select class="form-select" id="emp-filter-rol" onchange="App.filterEmpleados()">
+            <option value="">Todos los roles</option>
+            <option value="administrador">Administrador</option>
+            <option value="supervisor">Supervisor</option>
+            <option value="empleado">Empleado</option>
+          </select>
+          <select class="form-select" id="emp-filter-area" onchange="App.filterEmpleados()">
+            <option value="">Todas las áreas</option>
+            <option value="Cocina">Cocina</option>
+            <option value="Limpieza">Limpieza</option>
+            <option value="Recepción">Recepción</option>
+            <option value="Mantenimiento">Mantenimiento</option>
+            <option value="Administración">Administración</option>
+          </select>
+          <span class="toolbar-spacer"></span>
+          <span class="text-xs text-muted" id="emp-count"></span>
+        </div>
+
+        <div class="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Cédula</th>
+                <th>Área</th>
+                <th>Sede</th>
+                <th>Rol</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="emp-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════
+           HORARIOS — HU-12, HU-13
+           ══════════════════════════════ -->
+      <div id="page-horarios" class="page">
+        <div class="section-header">
+          <h2>Horarios</h2>
+          <div class="d-flex gap-8">
+            <select class="form-select" id="hor-filter-sede" onchange="App.renderHorarios()">
+              <option value="Palmares">Palmares</option>
+              <option value="Jacó">Jacó</option>
+              <option value="La Fortuna">La Fortuna</option>
+            </select>
+            <button class="btn btn-accent" onclick="App.openTurnoModal()">
+              <i class="bi bi-plus"></i> Asignar turno
+            </button>
+          </div>
+        </div>
+
+        <div class="table-card" style="overflow-x:auto;">
+          <table id="hor-table">
+            <thead id="hor-thead"></thead>
+            <tbody id="hor-tbody"></tbody>
+          </table>
+        </div>
+
+        <hr class="section-divider">
+        <div class="section-header">
+          <h3 style="font-size:16px;">Registro de asistencia</h3>
+        </div>
+        <div class="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Empleado</th>
+                <th>Fecha</th>
+                <th>Entrada</th>
+                <th>Pausa (min)</th>
+                <th>Salida</th>
+                <th>Horas efectivas</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="asist-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════
+           INVENTARIO — HU-14, HU-15, HU-16, HU-17, HU-18
+           ══════════════════════════════ -->
+      <div id="page-inventario" class="page">
+        <div class="section-header">
+          <h2>Inventario</h2>
+          <div class="d-flex gap-8">
+            <button class="btn btn-outline" onclick="App.openMovimientoModal()">
+              <i class="bi bi-arrow-left-right"></i> Movimiento
+            </button>
+            <button class="btn btn-accent" onclick="App.openInsumoModal()">
+              <i class="bi bi-plus"></i> Nuevo insumo
+            </button>
+          </div>
+        </div>
+
+        <!-- Alertas críticas -->
+        <div id="inv-alertas" class="mb-3"></div>
+
+        <div class="toolbar">
+          <select class="form-select" id="inv-filter-area" onchange="App.filterInventario()">
+            <option value="">Todas las áreas</option>
+            <option value="Cocina">Cocina</option>
+            <option value="Limpieza">Limpieza</option>
+          </select>
+          <select class="form-select" id="inv-filter-sede" onchange="App.filterInventario()">
+            <option value="">Todas las sedes</option>
+            <option value="Palmares">Palmares</option>
+            <option value="Jacó">Jacó</option>
+            <option value="La Fortuna">La Fortuna</option>
+          </select>
+          <div class="search-wrap">
+            <i class="bi bi-search"></i>
+            <input class="search-input" type="text" id="inv-search" placeholder="Buscar insumo..." oninput="App.filterInventario()" />
+          </div>
+          <span class="toolbar-spacer"></span>
+          <span class="text-xs text-muted" id="inv-count"></span>
+        </div>
+
+        <div class="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Insumo</th>
+                <th>Área</th>
+                <th>Sede</th>
+                <th>Stock</th>
+                <th>Umbral crítico</th>
+                <th>Unidad</th>
+                <th>Último movimiento</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="inv-tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Trazabilidad HU-17 -->
+        <hr class="section-divider">
+        <div class="section-header">
+          <h3 style="font-size:16px;">Historial de movimientos</h3>
+        </div>
+        <div class="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha/Hora</th>
+                <th>Insumo</th>
+                <th>Tipo</th>
+                <th>Cantidad</th>
+                <th>Responsable</th>
+                <th>Referencia</th>
+              </tr>
+            </thead>
+            <tbody id="mov-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════
+           REPORTES — HU-21, HU-22, HU-26
+           ══════════════════════════════ -->
+      <div id="page-reportes" class="page">
+        <div class="section-header">
+          <h2>Reportes</h2>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
+            <div class="report-card">
+              <h3><i class="bi bi-clock-history me-2 text-accent"></i>Reporte de asistencia</h3>
+              <div class="mb-3">
+                <label class="form-label">Sede</label>
+                <select class="form-input" id="rep-asist-sede">
+                  <option value="Palmares">Palmares</option>
+                  <option value="Jacó">Jacó</option>
+                  <option value="La Fortuna">La Fortuna</option>
+                </select>
+              </div>
+              <div class="row g-2 mb-3">
+                <div class="col-6">
+                  <label class="form-label">Desde</label>
+                  <input type="date" class="form-input" id="rep-asist-desde" />
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Hasta</label>
+                  <input type="date" class="form-input" id="rep-asist-hasta" />
+                </div>
+              </div>
+              <div class="d-flex gap-8">
+                <button class="btn btn-accent" onclick="App.generarReporte('asistencia','xlsx')">
+                  <i class="bi bi-file-earmark-excel"></i> Excel
+                </button>
+                <button class="btn btn-outline" onclick="App.generarReporte('asistencia','pdf')">
+                  <i class="bi bi-file-earmark-pdf"></i> PDF
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <div class="report-card">
+              <h3><i class="bi bi-box-seam me-2 text-accent"></i>Reporte de inventario</h3>
+              <div class="mb-3">
+                <label class="form-label">Sede</label>
+                <select class="form-input" id="rep-inv-sede">
+                  <option value="Palmares">Palmares</option>
+                  <option value="Jacó">Jacó</option>
+                  <option value="La Fortuna">La Fortuna</option>
+                </select>
+              </div>
+              <div class="row g-2 mb-3">
+                <div class="col-6">
+                  <label class="form-label">Mes</label>
+                  <input type="month" class="form-input" id="rep-inv-mes" />
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Área</label>
+                  <select class="form-input" id="rep-inv-area">
+                    <option value="">Todas</option>
+                    <option value="Cocina">Cocina</option>
+                    <option value="Limpieza">Limpieza</option>
+                  </select>
+                </div>
+              </div>
+              <div class="d-flex gap-8">
+                <button class="btn btn-accent" onclick="App.generarReporte('inventario','xlsx')">
+                  <i class="bi bi-file-earmark-excel"></i> Excel
+                </button>
+                <button class="btn btn-outline" onclick="App.generarReporte('inventario','pdf')">
+                  <i class="bi bi-file-earmark-pdf"></i> PDF
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Log de auditoría — HU-22 -->
+        <div class="section-header">
+          <h3 style="font-size:18px;">Log de auditoría</h3>
+        </div>
+        <div class="card card-pad">
+          <div id="audit-log"></div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════
+           SUCURSALES — HU-23, HU-24
+           ══════════════════════════════ -->
+      <div id="page-sucursales" class="page">
+        <div class="section-header">
+          <h2>Sucursales</h2>
+          <button class="btn btn-accent" onclick="App.openSucursalModal()">
+            <i class="bi bi-plus"></i> Nueva sucursal
+          </button>
+        </div>
+
+        <div class="row g-3 mb-4" id="branches-grid"></div>
+
+        <!-- Consolidación multisucursal HU-24 -->
+        <div class="section-header mt-20">
+          <h3 style="font-size:18px;">Consolidación multisucursal</h3>
+        </div>
+        <div class="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Sucursal</th>
+                <th>Empleados</th>
+                <th>Presentes hoy</th>
+                <th>Insumos críticos</th>
+                <th>Insumos OK</th>
+                <th>Estado general</th>
+              </tr>
+            </thead>
+            <tbody id="consolidado-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════
+           ROLES Y PERMISOS — HU-03, HU-04
+           ══════════════════════════════ -->
+      <div id="page-roles" class="page">
+        <div class="section-header">
+          <h2>Roles y permisos</h2>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <div class="card card-pad">
+              <div class="d-flex align-center gap-12 mb-12">
+                <div class="user-avatar" style="width:42px;height:42px;font-size:16px;">A</div>
+                <div>
+                  <div class="fw-500">Administrador</div>
+                  <div class="text-xs text-muted">Acceso total</div>
+                </div>
+              </div>
+              <ul style="font-size:12px;padding-left:16px;color:var(--muted);line-height:2;">
+                <li>Dashboard completo</li>
+                <li>Gestión de empleados</li>
+                <li>Asignación de turnos</li>
+                <li>Control de inventario</li>
+                <li>Generación de reportes</li>
+                <li>Gestión de sucursales</li>
+                <li>Gestión de roles</li>
+                <li>Log de auditoría</li>
+              </ul>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card card-pad">
+              <div class="d-flex align-center gap-12 mb-12">
+                <div class="user-avatar" style="width:42px;height:42px;font-size:16px;background:#2a2a28;">S</div>
+                <div>
+                  <div class="fw-500">Supervisor</div>
+                  <div class="text-xs text-muted">Acceso de área</div>
+                </div>
+              </div>
+              <ul style="font-size:12px;padding-left:16px;color:var(--muted);line-height:2;">
+                <li>Dashboard (su sede)</li>
+                <li>Ver empleados</li>
+                <li>Asignación de turnos</li>
+                <li>Control de inventario</li>
+                <li>Generación de reportes</li>
+                <li style="color:var(--danger-bd);">— Gestión de sucursales</li>
+                <li style="color:var(--danger-bd);">— Gestión de roles</li>
+              </ul>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card card-pad">
+              <div class="d-flex align-center gap-12 mb-12">
+                <div class="user-avatar" style="width:42px;height:42px;font-size:16px;background:var(--accent);">E</div>
+                <div>
+                  <div class="fw-500">Empleado</div>
+                  <div class="text-xs text-muted">Acceso básico</div>
+                </div>
+              </div>
+              <ul style="font-size:12px;padding-left:16px;color:var(--muted);line-height:2;">
+                <li>Reloj checador</li>
+                <li>Consultar mis turnos</li>
+                <li style="color:var(--danger-bd);">— Dashboard</li>
+                <li style="color:var(--danger-bd);">— Gestión de empleados</li>
+                <li style="color:var(--danger-bd);">— Inventario</li>
+                <li style="color:var(--danger-bd);">— Reportes</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabla de asignación de roles -->
+        <div class="section-header">
+          <h3 style="font-size:18px;">Asignación de roles</h3>
+        </div>
+        <div class="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Empleado</th>
+                <th>Correo</th>
+                <th>Sede</th>
+                <th>Rol actual</th>
+                <th>Cambiar rol</th>
+              </tr>
+            </thead>
+            <tbody id="roles-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </main><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ═══════════════════════════════════
+     MODALES
+     ═══════════════════════════════════ -->
+
+<!-- Modal empleado — HU-05, HU-07 -->
+<div id="modal-empleado" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="emp-modal-title">Nuevo empleado</h2>
+      <button class="btn btn-ghost btn-sm" onclick="App.closeModal('modal-empleado')">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+
+    <input type="hidden" id="emp-id" />
+
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Nombre completo *</label>
+        <input class="form-input" id="emp-nombre" placeholder="Ej. Laura Aguilar Brenes" />
+        <div class="form-error" id="err-emp-nombre">Campo requerido.</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Cédula *</label>
+        <input class="form-input" id="emp-cedula" placeholder="1-2345-6789" />
+        <div class="form-error" id="err-emp-cedula">Cédula ya registrada.</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Correo institucional *</label>
+        <input class="form-input" id="emp-email" type="email" placeholder="nombre@hotelpalmares.cr" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Área *</label>
+        <select class="form-input" id="emp-area">
+          <option value="Cocina">Cocina</option>
+          <option value="Limpieza">Limpieza</option>
+          <option value="Recepción">Recepción</option>
+          <option value="Mantenimiento">Mantenimiento</option>
+          <option value="Administración">Administración</option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Sede *</label>
+        <select class="form-input" id="emp-sede">
+          <option value="Palmares">Palmares</option>
+          <option value="Jacó">Jacó</option>
+          <option value="La Fortuna">La Fortuna</option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Rol *</label>
+        <select class="form-input" id="emp-rol">
+          <option value="empleado">Empleado</option>
+          <option value="supervisor">Supervisor</option>
+          <option value="administrador">Administrador</option>
+        </select>
+      </div>
+      <div class="col-12" id="emp-estado-wrap">
+        <label class="form-label">Estado</label>
+        <select class="form-input" id="emp-estado">
+          <option value="activo">Activo</option>
+          <option value="inactivo">Inactivo</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="App.closeModal('modal-empleado')">Cancelar</button>
+      <button class="btn btn-accent" onclick="App.saveEmpleado()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal turno — HU-12 -->
+<div id="modal-turno" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">Asignar turno</h2>
+      <button class="btn btn-ghost btn-sm" onclick="App.closeModal('modal-turno')">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="row g-3">
+      <div class="col-12">
+        <label class="form-label">Empleado *</label>
+        <select class="form-input" id="turno-emp"></select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Día *</label>
+        <input type="date" class="form-input" id="turno-dia" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Entrada *</label>
+        <input type="time" class="form-input" id="turno-entrada" value="07:00" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Salida *</label>
+        <input type="time" class="form-input" id="turno-salida" value="15:00" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="App.closeModal('modal-turno')">Cancelar</button>
+      <button class="btn btn-accent" onclick="App.saveTurno()">Guardar turno</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal insumo — HU-14, HU-16 -->
+<div id="modal-insumo" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="insumo-modal-title">Nuevo insumo</h2>
+      <button class="btn btn-ghost btn-sm" onclick="App.closeModal('modal-insumo')">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <input type="hidden" id="insumo-id" />
+    <div class="row g-3">
+      <div class="col-md-8">
+        <label class="form-label">Nombre del insumo *</label>
+        <input class="form-input" id="insumo-nombre" placeholder="Ej. Detergente multiusos" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Unidad *</label>
+        <select class="form-input" id="insumo-unidad">
+          <option>Galón</option><option>Litro</option><option>kg</option>
+          <option>Unidad</option><option>Rollo</option><option>Caja</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Área *</label>
+        <select class="form-input" id="insumo-area">
+          <option value="Cocina">Cocina</option>
+          <option value="Limpieza">Limpieza</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Sede *</label>
+        <select class="form-input" id="insumo-sede">
+          <option value="Palmares">Palmares</option>
+          <option value="Jacó">Jacó</option>
+          <option value="La Fortuna">La Fortuna</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Stock actual *</label>
+        <input type="number" class="form-input" id="insumo-stock" min="0" value="0" />
+      </div>
+      <div class="col-12">
+        <label class="form-label">Umbral crítico (alerta automática) *</label>
+        <input type="number" class="form-input" id="insumo-umbral" min="1" value="5" />
+        <div class="text-xs text-muted mt-4">El sistema generará una alerta cuando el stock alcance o baje de este valor.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="App.closeModal('modal-insumo')">Cancelar</button>
+      <button class="btn btn-accent" onclick="App.saveInsumo()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal movimiento — HU-15, HU-17 -->
+<div id="modal-movimiento" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">Registrar movimiento</h2>
+      <button class="btn btn-ghost btn-sm" onclick="App.closeModal('modal-movimiento')">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="row g-3">
+      <div class="col-12">
+        <label class="form-label">Insumo *</label>
+        <select class="form-input" id="mov-insumo"></select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Tipo *</label>
+        <select class="form-input" id="mov-tipo">
+          <option value="entrada">Entrada (recepción)</option>
+          <option value="salida">Salida (consumo)</option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Cantidad *</label>
+        <input type="number" class="form-input" id="mov-cantidad" min="1" value="1" />
+      </div>
+      <div class="col-12">
+        <label class="form-label">Referencia / Orden de compra</label>
+        <input class="form-input" id="mov-ref" placeholder="Ej. OC-2026-087" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="App.closeModal('modal-movimiento')">Cancelar</button>
+      <button class="btn btn-accent" onclick="App.saveMovimiento()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal sucursal — HU-23 -->
+<div id="modal-sucursal" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">Nueva sucursal</h2>
+      <button class="btn btn-ghost btn-sm" onclick="App.closeModal('modal-sucursal')">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Nombre *</label>
+        <input class="form-input" id="suc-nombre" placeholder="Ej. San José" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Provincia *</label>
+        <select class="form-input" id="suc-provincia">
+          <option>Alajuela</option><option>San José</option><option>Heredia</option>
+          <option>Cartago</option><option>Guanacaste</option><option>Puntarenas</option><option>Limón</option>
+        </select>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Descripción</label>
+        <input class="form-input" id="suc-desc" placeholder="Tipo de sede, servicios..." />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="App.closeModal('modal-sucursal')">Cancelar</button>
+      <button class="btn btn-accent" onclick="App.saveSucursal()">Crear sucursal</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
