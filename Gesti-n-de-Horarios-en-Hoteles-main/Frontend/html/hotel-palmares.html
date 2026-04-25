@@ -2396,27 +2396,26 @@ const startClock = () => {
 
 const checkCurrentAsistencia = async () => {
   if (!state.user?.empleado_id) {
-    // Sin empleado vinculado: el checador no aplica. Dejamos los botones deshabilitados
-    // pero mostramos un mensaje claro.
     state.checadorStatus = 'sin_ficha';
     updateChecadorUI();
     return;
   }
   try {
     const data = await apiCall(`/asistencias/mi-turno?fecha=${fmtDate(new Date())}`);
+    console.log('[CHECADOR] Respuesta de mi-turno:', data);
     if (data && data.estado) {
       state.checadorEntrada = data.hora_entrada?.slice(0,5);
       state.checadorPausaTotal = data.pausa_total_min || 0;
-      // Normalizar: si el backend devuelve 'finalizado', lo reflejamos como tal
       state.checadorStatus = data.estado;
+      console.log('[CHECADOR] Estado actualizado a:', state.checadorStatus, '| Entrada:', state.checadorEntrada);
     } else {
-      // No hay registro hoy → libre
       state.checadorStatus = 'libre';
       state.checadorEntrada = null;
       state.checadorPausaTotal = 0;
+      console.log('[CHECADOR] Sin registro hoy, estado: libre');
     }
     updateChecadorUI();
-  } catch(e) { console.error(e); }
+  } catch(e) { console.error('[CHECADOR] Error en mi-turno:', e); }
 };
 
 const renderChecador = async () => {
@@ -2438,7 +2437,7 @@ const updateChecadorUI = () => {
     cerrado:     { chip: 'chip-ok',        label: 'Turno cerrado' },
     sin_ficha:   { chip: 'chip-pendiente', label: 'Este usuario no es empleado registrado' },
   };
-  const s = statusMap[state.checadorStatus] || statusMap.libre;
+  const s = statusMap[state.checadorStatus] || { chip: 'chip-pendiente', label: `Estado: ${state.checadorStatus || 'desconocido'}` };
   const statusEl = document.getElementById('checador-status-chip');
   if (statusEl) statusEl.innerHTML = `<span class="chip ${s.chip}">${s.label}</span>`;
   const btnEntrada = document.getElementById('btn-entrada');
@@ -2451,27 +2450,35 @@ const updateChecadorUI = () => {
     if (btnSalida)  btnSalida.disabled  = true;
     return;
   }
-  // Entrada: solo si está libre
-  if (btnEntrada) btnEntrada.disabled = state.checadorStatus !== 'libre';
-  // Pausa/Salida: solo si está activo o en pausa
-  if (btnPausa)   btnPausa.disabled   = !['activo', 'pausa'].includes(state.checadorStatus);
-  if (btnSalida)  btnSalida.disabled  = !['activo', 'pausa'].includes(state.checadorStatus);
+  // Política permisiva: dejamos que el backend valide.
+  // Solo deshabilitamos pausa/salida cuando claramente no hay turno activo (libre/finalizado).
+  if (btnEntrada) btnEntrada.disabled = false;
+  if (btnPausa)   btnPausa.disabled   = ['libre', 'finalizado', 'cerrado'].includes(state.checadorStatus);
+  if (btnSalida)  btnSalida.disabled  = ['libre', 'finalizado', 'cerrado'].includes(state.checadorStatus);
   if (btnPausa)   btnPausa.innerHTML  = state.checadorStatus === 'pausa'
     ? '<i class="bi bi-play"></i> Reanudar'
     : '<i class="bi bi-pause"></i> Pausa';
 };
 
 const checadorAction = async (type) => {
+  console.log('[CHECADOR] Click tipo:', type);
+  console.log('[CHECADOR] Estado actual:', state.checadorStatus);
+  console.log('[CHECADOR] Usuario:', state.user?.email, '| empleado_id:', state.user?.empleado_id);
+
   if (!state.user?.empleado_id) {
     toast('Este usuario no tiene ficha de empleado. Pide a un administrador que te registre.', 'error');
+    console.warn('[CHECADOR] BLOQUEADO: sin empleado_id');
     return;
   }
   const now = new Date();
   const nowStr = fmtTime(now);
   try {
     if (type === 'entrada') {
-      if (state.checadorStatus !== 'libre') { toast('Ya tienes una entrada activa o finalizada hoy', 'warning'); return; }
-      await apiCall('/asistencias/entrada', { method: 'POST' });
+      // QUITAR la validación local — dejamos que el backend decida.
+      // Si ya hay una entrada, devuelve 409 y refrescamos el estado.
+      console.log('[CHECADOR] Llamando POST /asistencias/entrada...');
+      const data = await apiCall('/asistencias/entrada', { method: 'POST' });
+      console.log('[CHECADOR] Respuesta:', data);
       state.checadorStatus = 'activo';
       state.checadorEntrada = nowStr;
       toast(`Entrada registrada a las ${nowStr}`, 'success');
@@ -2479,20 +2486,26 @@ const checadorAction = async (type) => {
     }
     if (type === 'pausa') {
       const accion = state.checadorStatus === 'activo' ? 'iniciar' : 'finalizar';
+      console.log('[CHECADOR] Pausa accion:', accion);
       const data = await apiCall(`/asistencias/pausa?accion=${accion}`, { method: 'POST' });
       if (accion === 'iniciar') { state.checadorStatus = 'pausa'; toast('Pausa iniciada', 'warning'); }
       else { state.checadorPausaTotal = data.pausa_total_min; state.checadorStatus = 'activo'; toast('Pausa finalizada', 'success'); }
     }
     if (type === 'salida') {
-      if (!['activo', 'pausa'].includes(state.checadorStatus)) return;
-      await apiCall('/asistencias/salida', { method: 'POST' });
+      console.log('[CHECADOR] Llamando POST /asistencias/salida...');
+      const data = await apiCall('/asistencias/salida', { method: 'POST' });
+      console.log('[CHECADOR] Respuesta salida:', data);
       state.checadorStatus = 'finalizado';
       toast('Salida registrada', 'success');
       await loadAsistencias(fmtDate(now));
     }
     updateChecadorUI();
     renderTurnoTable();
-  } catch(e) { toast(e.message, 'error'); }
+  } catch(e) {
+    console.error('[CHECADOR] Error:', e);
+    toast(e.message || 'Error desconocido', 'error');
+    await checkCurrentAsistencia();
+  }
 };
 
 const renderWeekGrid = () => {

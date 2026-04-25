@@ -8,6 +8,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from config import supabase
 from middleware.auth import get_current_user, require_roles
+from utils.audit import safe_audit
 from schema.schemas import EmpleadoCreate, EmpleadoOut, EmpleadoUpdate
 
 router = APIRouter()
@@ -41,22 +42,22 @@ def crear_empleado(
         "nombre": body.nombre,
         "cedula": body.cedula,
         "email": body.email,
-        "area": body.area.value,  # ← CORREGIDO
+        "area": body.area.value,
         "sede_id": body.sede_id,
-        "rol": body.rol.value,  # ← CORREGIDO
-        "estado": "activo",  # ← CORREGIDO
+        "rol": body.rol.value,
+        "estado": "activo",
     }
     resp = supabase.table("empleados").insert(data).execute()
     if not resp.data:
         raise HTTPException(status_code=500, detail="Error al registrar el empleado")
 
-    supabase.table("audit_log").insert({
-        "usuario_id": current_user["usuario_id"],
-        "usuario_nombre": current_user["nombre"],
-        "accion": "CREATE_EMP",
-        "modulo": "empleados",
-        "metadata": {"nombre": body.nombre, "email": body.email},
-    }).execute()
+    safe_audit(
+        usuario_id=current_user["usuario_id"],
+        usuario_nombre=current_user["nombre"],
+        accion="CREATE_EMP",
+        modulo="empleados",
+        metadata={"nombre": body.nombre, "email": body.email},
+    )
 
     return resp.data[0]
 
@@ -81,11 +82,11 @@ def listar_empleados(
         query = query.eq("sede_id", sede_id)
 
     if area:
-        query = query.eq("area", area)  # ← CORREGIDO
+        query = query.eq("area", area)
     if rol:
-        query = query.eq("rol", rol)  # ← CORREGIDO
+        query = query.eq("rol", rol)
     if estado:
-        query = query.eq("estado", estado)  # ← CORREGIDO
+        query = query.eq("estado", estado)
 
     resp = query.order("nombre").execute()
     return resp.data or []
@@ -128,23 +129,23 @@ def actualizar_empleado(
 
     # Convertir enums a string
     if "area" in data and data["area"]:
-        data["area"] = data["area"].value
+        data["area"] = data["area"].value if hasattr(data["area"], "value") else data["area"]
     if "rol" in data and data["rol"]:
-        data["rol"] = data["rol"].value
+        data["rol"] = data["rol"].value if hasattr(data["rol"], "value") else data["rol"]
     if "estado" in data and data["estado"]:
-        data["estado"] = data["estado"].value
+        data["estado"] = data["estado"].value if hasattr(data["estado"], "value") else data["estado"]
 
     resp = supabase.table("empleados").update(data).eq("id", empleado_id).execute()
     if not resp.data:
         raise HTTPException(status_code=404, detail="Empleado no encontrado")
 
-    supabase.table("audit_log").insert({
-        "usuario_id": current_user["usuario_id"],
-        "usuario_nombre": current_user["nombre"],
-        "accion": "UPDATE_EMP",
-        "modulo": "empleados",
-        "metadata": {"empleado_id": empleado_id, "changes": data},
-    }).execute()
+    safe_audit(
+        usuario_id=current_user["usuario_id"],
+        usuario_nombre=current_user["nombre"],
+        accion="UPDATE_EMP",
+        modulo="empleados",
+        metadata={"empleado_id": empleado_id, "changes": data},
+    )
 
     return resp.data[0]
 
@@ -166,12 +167,12 @@ def desactivar_empleado(
     if not resp.data:
         raise HTTPException(status_code=404, detail="Empleado no encontrado")
 
-    supabase.table("audit_log").insert({
-        "usuario_id": current_user["usuario_id"],
-        "usuario_nombre": current_user["nombre"],
-        "accion": "DEACTIVATE_EMP",
-        "modulo": "empleados",
-        "metadata": {"empleado_id": empleado_id},
-    }).execute()
+    safe_audit(
+        usuario_id=current_user["usuario_id"],
+        usuario_nombre=current_user["nombre"],
+        accion="DEACTIVATE_EMP",
+        modulo="empleados",
+        metadata={"empleado_id": empleado_id},
+    )
 
     return {"message": "Empleado desactivado correctamente"}

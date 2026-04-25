@@ -167,7 +167,7 @@ def gestionar_pausa(
 
 # ── CONSULTA DE TURNO ─────────────────────────────────────────────────────────
 
-@router.get("/mi-turno", response_model=Optional[AsistenciaOut], summary="HU-11 — Consultar turno propio")
+@router.get("/mi-turno", summary="HU-11 — Consultar turno propio")
 def mi_turno(
     fecha: Optional[date] = Query(None),
     current_user: dict = Depends(get_current_user),
@@ -175,17 +175,26 @@ def mi_turno(
     if not current_user.get("empleado_id"):
         # Si no hay empleado_id (p.ej. admin sin ficha), devolvemos None en lugar de 403
         # para que el frontend no rompa.
+        print(f"[MI-TURNO] Usuario {current_user.get('email')} sin empleado_id → null")
         return None
 
     target = fecha.isoformat() if fecha else date.today().isoformat()
+    emp_id = current_user["empleado_id"]
+    print(f"[MI-TURNO] Buscando asistencia: empleado_id={emp_id}, fecha={target}")
+
     resp = (
         supabase.table("asistencias")
         .select("*")
-        .eq("empleado_id", current_user["empleado_id"])
+        .eq("empleado_id", emp_id)
         .eq("fecha", target)
         .execute()
     )
-    return resp.data[0] if resp.data else None
+    print(f"[MI-TURNO] Resultados encontrados: {len(resp.data) if resp.data else 0}")
+    if resp.data:
+        print(f"[MI-TURNO] Devolviendo: {resp.data[0]}")
+        return resp.data[0]
+    print(f"[MI-TURNO] Sin registros, devolviendo null")
+    return None
 
 
 # ── TURNOS ASIGNADOS ──────────────────────────────────────────────────────────
@@ -200,7 +209,6 @@ def asignar_turno(
         "dia": body.fecha.isoformat(),
         "entrada": body.hora_inicio.strftime("%H:%M:%S"),
         "salida": body.hora_fin.strftime("%H:%M:%S"),
-        "asignado_por": current_user.get("empleado_id"),
     }
     resp = supabase.table("turnos").insert(data).execute()
     if not resp.data:

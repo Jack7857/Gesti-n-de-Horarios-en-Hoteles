@@ -74,7 +74,7 @@ def get_current_user(authorization: Optional[str] = Header(None)):
     sede_id_emp = None
     emp_resp = (
         supabase.table("empleados")
-        .select("id, sede_id")
+        .select("id, sede_id, nombre")
         .eq("usuario_id", usuario_id)
         .limit(1)
         .execute()
@@ -82,6 +82,9 @@ def get_current_user(authorization: Optional[str] = Header(None)):
     if emp_resp.data:
         empleado_id = emp_resp.data[0]["id"]
         sede_id_emp = emp_resp.data[0].get("sede_id")
+        print(f"[AUTH] Usuario {user['email']} (id={user['id']}) → empleado_id={empleado_id} ({emp_resp.data[0].get('nombre')})")
+    else:
+        print(f"[AUTH] Usuario {user['email']} (id={user['id']}) sin empleado vinculado")
 
     return {
         "usuario_id": user["id"],

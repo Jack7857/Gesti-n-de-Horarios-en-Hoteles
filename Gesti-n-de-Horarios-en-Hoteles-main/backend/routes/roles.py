@@ -6,6 +6,7 @@ Gestión de roles y permisos (sobre tabla usuarios)
 from fastapi import APIRouter, Depends, HTTPException, status
 from config import supabase
 from middleware.auth import require_roles
+from utils.audit import safe_audit
 from schema.schemas import CambioRolRequest
 
 router = APIRouter()
@@ -44,18 +45,18 @@ def cambiar_rol(
     # Propagar el cambio a la tabla empleados (si existe vinculación)
     supabase.table("empleados").update({"rol": nuevo_rol}).eq("usuario_id", body.usuario_id).execute()
 
-    supabase.table("audit_log").insert({
-        "usuario_id": current_user["usuario_id"],
-        "usuario_nombre": current_user["nombre"],
-        "accion": "CHANGE_ROL",
-        "modulo": "roles",
-        "metadata": {
+    safe_audit(
+        usuario_id=current_user["usuario_id"],
+        usuario_nombre=current_user["nombre"],
+        accion="CHANGE_ROL",
+        modulo="roles",
+        metadata={
             "email": user.data["email"],
             "nombre": user.data["nombre"],
             "rol_anterior": rol_anterior,
             "rol_nuevo": nuevo_rol,
         },
-    }).execute()
+    )
 
     return {
         "message": "Rol actualizado correctamente",
@@ -70,7 +71,6 @@ def audit_log(
     limit: int = 100,
     current_user: dict = Depends(require_roles(["administrador"])),
 ):
-    # No hacemos join con usuarios (no siempre existe); el audit_log ya trae usuario_nombre
     resp = (
         supabase.table("audit_log")
         .select("*")

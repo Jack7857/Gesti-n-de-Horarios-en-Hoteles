@@ -9,6 +9,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from config import supabase
 from middleware.auth import get_current_user, require_roles
+from utils.audit import safe_audit
 from schema.schemas import (
     InsumoCreate,
     InsumoOut,
@@ -40,13 +41,13 @@ def crear_insumo(
     if not resp.data:
         raise HTTPException(status_code=500, detail="Error al crear el insumo")
 
-    supabase.table("audit_log").insert({
-        "usuario_id": current_user["usuario_id"],
-        "usuario_nombre": current_user["nombre"],
-        "accion": "CREATE_INSUMO",
-        "modulo": "inventario",
-        "metadata": {"nombre": body.nombre},
-    }).execute()
+    safe_audit(
+        usuario_id=current_user["usuario_id"],
+        usuario_nombre=current_user["nombre"],
+        accion="CREATE_INSUMO",
+        modulo="inventario",
+        metadata={"nombre": body.nombre},
+    )
 
     return resp.data[0]
 
@@ -89,7 +90,6 @@ def actualizar_insumo(
     if not data:
         raise HTTPException(status_code=400, detail="No se proporcionaron campos para actualizar")
 
-    # Convertir enum si viene
     if "area" in data and data["area"]:
         data["area"] = data["area"].value if hasattr(data["area"], "value") else data["area"]
 
@@ -102,13 +102,13 @@ def actualizar_insumo(
     if not resp.data:
         raise HTTPException(status_code=404, detail="Insumo no encontrado")
 
-    supabase.table("audit_log").insert({
-        "usuario_id": current_user["usuario_id"],
-        "usuario_nombre": current_user["nombre"],
-        "accion": "UPDATE_INSUMO",
-        "modulo": "inventario",
-        "metadata": {"insumo_id": insumo_id, "changes": data},
-    }).execute()
+    safe_audit(
+        usuario_id=current_user["usuario_id"],
+        usuario_nombre=current_user["nombre"],
+        accion="UPDATE_INSUMO",
+        modulo="inventario",
+        metadata={"insumo_id": insumo_id, "changes": data},
+    )
 
     return resp.data[0]
 
@@ -182,8 +182,6 @@ def listar_movimientos(
 
 @router.get("/alertas", summary="HU-16 — Insumos con stock crítico")
 def alertas_stock_critico(current_user: dict = Depends(get_current_user)):
-    # Supabase PostgREST no permite comparar dos columnas directamente desde
-    # el cliente Python, así que traemos todo y filtramos en memoria.
     resp = (
         supabase.table("insumos")
         .select("*")
